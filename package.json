@@ -1,0 +1,81 @@
+{
+  "name": "valo-shop-viewer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Interface locale pour voir son shop Valorant et sa collection de skins",
+  "type": "module",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "node server.js",
+    "app": "electron .",
+    "icon": "node build/make-icon.mjs",
+    "dist": "node build/make-icon.mjs && electron-builder --win --publish never"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "electron": "^38.8.6",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "local.valoshop.viewer",
+    "productName": "Valo Shop",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**",
+      "public/**",
+      "server.js",
+      "riot.js",
+      "live.js",
+      "stats.js",
+      "party.js",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "portable": {
+      "artifactName": "ValoShop-portable.exe"
+    },
+    "nsis": {
+      "artifactName": "ValoShop-Setup.exe",
+      "oneClick": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Valo Shop"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Robert229919",
+        "repo": "valo-shop",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Robert229919/valo-shop.git"
+  }
+}
