@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Valo Shop</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+  <script>
+    try { const t = localStorage.getItem('theme'); if (t) document.documentElement.dataset.theme = t; } catch {}
+  </script>
+</head>
+<body>
+  <header class="masthead">
+    <div class="masthead-row">
+      <a class="brand" href="#" data-tab="shop">
+        <span class="lamp" aria-hidden="true"></span>
+        <span class="brand-word">Valo<span>Shop</span></span>
+      </a>
+      <nav class="tabs hidden" id="tabs">
+        <button data-tab="shop" class="active">Boutique</button>
+        <button data-tab="collection">Collection</button>
+        <button data-tab="live">En jeu<i class="live-dot hidden" id="live-dot"></i></button>
+      </nav>
+      <div class="account hidden" id="account">
+        <div class="wallet" id="wallet"></div>
+      </div>
+      <div class="actions">
+        <button class="icon-btn" id="theme" title="Jour / nuit" aria-label="Basculer jour / nuit">◐</button>
+        <div class="acct hidden" id="acct">
+          <button class="acct-btn" id="acct-btn" aria-haspopup="menu" aria-expanded="false" title="Changer de compte">
+            <span class="glow-dot" id="acct-dot"></span>
+            <span class="acct-name" id="acct-name">Compte</span>
+            <span class="acct-caret" aria-hidden="true">▾</span>
+          </button>
+          <div class="acct-menu hidden" id="acct-menu" role="menu"></div>
+        </div>
+      </div>
+    </div>
+    <div class="dateline">
+      <span id="date"></span>
+      <span id="player"></span>
+    </div>
+  </header>
+
+  <main>
+    <!-- Compte à reconnecter -->
+    <div class="warn relogin-banner hidden" id="relogin-banner">
+      <span id="relogin-msg"></span>
+      <button class="btn equip" id="relogin-btn">Se reconnecter</button>
+    </div>
+
+    <!-- Connexion -->
+    <section id="login" class="login hidden">
+      <div class="login-hero">
+        <h1 class="poster">Connexion.</h1>
+        <div class="login-intro">
+          <p class="lede">Ta boutique et ta collection, accrochées au mur.</p>
+          <p class="muted">Tes identifiants ne passent jamais par cette appli : tu te connectes sur la vraie page Riot, ou on réutilise la session de ton Riot Client.</p>
+          <label class="field">Région
+            <select id="region">
+              <option value="">Auto</option>
+              <option value="eu">EU</option>
+              <option value="na">NA</option>
+              <option value="latam">LATAM</option>
+              <option value="br">BR</option>
+              <option value="ap">AP</option>
+              <option value="kr">KR</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div class="panel riot-card hidden" id="riot-card">
+        <div>
+          <span class="kicker"><span class="glow-dot"></span>Recommandé</span>
+          <h2>Se connecter avec Riot</h2>
+          <p class="muted">La page officielle s'ouvre dans une fenêtre. Coche <b>« Rester connecté »</b> et l'appli renouvellera ta session toute seule.</p>
+        </div>
+        <button class="btn primary" id="login-riot">Se connecter</button>
+      </div>
+
+      <div class="login-grid">
+        <div class="panel">
+          <span class="kicker" id="local-tag"><span class="glow-dot"></span>Recommandé</span>
+          <h2>Via le Riot Client</h2>
+          <p class="muted">Lance le Riot Client sur ce PC, connecte-toi, puis clique.</p>
+          <button class="btn" id="login-local">Utiliser ma session</button>
+        </div>
+        <div class="panel" id="paste-card">
+          <h2>Via la page Riot</h2>
+          <ol class="muted steps">
+            <li><a id="riot-link" target="_blank" rel="noopener">Ouvre la page de connexion Riot</a>.</li>
+            <li>Copie l'URL playvalorant.com vers laquelle tu es redirigé.</li>
+            <li>Colle-la ici (valable ~1 h).</li>
+          </ol>
+          <input id="redirect-url" placeholder="https://playvalorant.com/opt_in#access_token=…" autocomplete="off">
+          <button class="btn" id="login-url">Se connecter</button>
+        </div>
+      </div>
+      <p class="error" id="login-error"></p>
+    </section>
+
+    <!-- Boutique -->
+    <section id="shop" class="view hidden">
+      <div class="hero">
+        <div>
+          <p class="kicker">Édition du jour</p>
+          <h1 class="poster">La boutique.</h1>
+        </div>
+        <div class="glow-clock" title="Renouvellement de la boutique">
+          <span class="glow-clock-label">Prochaine rotation</span>
+          <span class="glow-clock-time" id="daily-timer">--:--:--</span>
+          <button class="link-btn" id="refresh-shop">Rafraîchir</button>
+        </div>
+      </div>
+      <div class="wall shop-wall" id="daily"></div>
+
+      <div id="night-wrap" class="hidden">
+        <div class="section-title">
+          <h2 class="poster small">Marché nocturne</h2>
+          <span class="rule"></span>
+          <span class="timer" id="night-timer"></span>
+        </div>
+        <div class="wall shop-wall" id="night"></div>
+      </div>
+
+      <div id="bundles-wrap" class="hidden">
+        <div class="section-title">
+          <h2 class="poster small">À la une</h2>
+          <span class="rule"></span>
+        </div>
+        <div class="bundles" id="bundles"></div>
+      </div>
+    </section>
+
+    <!-- Collection -->
+    <section id="collection" class="view hidden">
+      <div class="hero compact">
+        <div class="title-row">
+          <h1 class="poster compact">Collection.</h1>
+          <p class="kicker" id="collection-stats">&nbsp;</p>
+        </div>
+        <div class="filters">
+          <input id="search" class="underline" placeholder="Rechercher un skin…" autocomplete="off">
+          <label class="switch"><input type="checkbox" id="owned-only" checked><span></span>Possédés seulement</label>
+        </div>
+      </div>
+      <p class="warn hidden" id="loadout-warn"></p>
+      <div id="board" class="board"></div>
+      <div id="search-results" class="hidden"></div>
+    </section>
+
+    <div id="loading" class="loading hidden"><span class="lamp big"></span></div>
+    <p class="error center" id="global-error"></p>
+    <!-- Partie en cours -->
+    <section id="live" class="view hidden">
+      <div class="hero compact">
+        <div class="title-row">
+          <h1 class="poster compact">En jeu.</h1>
+          <p class="kicker" id="live-sub">&nbsp;</p>
+        </div>
+        <span class="live-refresh" id="live-refresh"></span>
+      </div>
+      <div id="live-body"></div>
+    </section>
+  </main>
+
+  <!-- Détail d'une arme -->
+  <dialog id="weapon-dialog">
+    <div class="dialog-head">
+      <div>
+        <p class="kicker" id="dlg-sub"></p>
+        <h2 class="poster" id="dlg-title"></h2>
+      </div>
+      <button class="icon-btn" id="dlg-close" aria-label="Fermer">✕</button>
+    </div>
+    <div class="wall skin-wall" id="dlg-skins"></div>
+  </dialog>
+
+  <!-- Détail d'un joueur (partie en cours) -->
+  <dialog id="player-dialog">
+    <div class="dialog-head pd-head">
+      <div class="pd-who" id="pd-who"></div>
+      <button class="icon-btn" id="pd-close" aria-label="Fermer">✕</button>
+    </div>
+    <div id="pd-body"></div>
+  </dialog>
+
+  <!-- Détail d'une partie : tableau, rounds, duels -->
+  <dialog id="match-dialog" class="wide-dialog">
+    <div class="dialog-head md-head">
+      <div class="md-who" id="md-who"></div>
+      <button class="icon-btn" id="md-close" aria-label="Fermer">✕</button>
+    </div>
+    <div id="md-body"></div>
+  </dialog>
+
+  <!-- Contenu d'un pack de la boutique -->
+  <dialog id="bundle-dialog" class="wide-dialog">
+    <div class="dialog-head">
+      <div>
+        <p class="kicker" id="bd-sub"></p>
+        <h2 class="poster" id="bd-title"></h2>
+      </div>
+      <button class="icon-btn" id="bd-close" aria-label="Fermer">✕</button>
+    </div>
+    <div class="wall skin-wall" id="bd-items"></div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <script src="/app.js" type="module"></script>
+</body>
+</html>
