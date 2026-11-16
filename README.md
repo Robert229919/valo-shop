@@ -16,7 +16,7 @@ Appli Windows pour Valorant :
 👉 **[Dernière version](https://github.com/Robert229919/valo-shop/releases/latest)**
 
 - `ValoShop-Setup.exe` : installe l'appli avec un raccourci sur le Bureau et dans le menu Démarrer. **Elle se met à jour toute seule.**
-- `ValoShop-portable.exe` : se lance sans installation, mais n'a pas de mise à jour automatique.
+- `ValoShop-portable.exe` : se lance sans installation. Au lancement, il vérifie s'il existe une nouvelle version et propose de la télécharger : l'appli se ferme, remplace son propre fichier puis se relance toute seule, sans passer par GitHub.
 
 Au premier lancement, Windows SmartScreen peut afficher « Windows a protégé votre ordinateur », parce que l'exe n'est pas signé. Clique sur **Informations complémentaires**, puis **Exécuter quand même**.
 
