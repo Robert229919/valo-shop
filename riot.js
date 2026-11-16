@@ -550,7 +550,12 @@ async function pdFor(acc, pathname, { method = 'GET', body, host = 'pd' } = {}, 
     }
     lose(acc, `Riot a refusé la requête (${res.status})`);
   }
-  throw Object.assign(new Error(`Erreur Riot ${res.status} sur ${pathname} ${text.slice(0, 200)}`), { riotStatus: res.status });
+  // 429 : Riot limite le débit ; les pages d'erreur HTML (Cloudflare) ne sont pas affichées telles quelles
+  const detail = /^\s*</.test(text) ? '' : text.slice(0, 200);
+  const msg = res.status === 429
+    ? 'Riot limite temporairement les requêtes (429). Patiente une minute puis réessaie.'
+    : `Erreur Riot ${res.status} sur ${pathname} ${detail}`.trim();
+  throw Object.assign(new Error(msg), { riotStatus: res.status });
 }
 const pd = (pathname, opts) => pdFor(mustBeActive(), pathname, opts);
 

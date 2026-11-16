@@ -815,3 +815,21 @@ body:has(#live:not(.hidden)) main { padding-bottom: 16px; padding-top: 22px; }
 .dm-head .dm-tot { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); }
 .dm-tot.win { color: var(--glow); }
 .dm-rivals { margin-top: 18px; grid-auto-columns: minmax(0, 260px); }
+
+/* ---------- duels : alliés en colonnes, adversaires en lignes ---------- */
+.dm-who.me small { color: var(--glow); }
+.dm-who.me > img { border-color: var(--glow); box-shadow: 0 0 10px -2px var(--glow); }
+.dm-c.me-col { outline: 1px solid color-mix(in srgb, var(--glow) 45%, transparent); outline-offset: -1px; }
+.dm-foot { border-top: 1px solid var(--ink); border-bottom: 0; margin-top: 2px; }
+.dm-foot .dm-tot { text-align: center; }
+.dm-foot .dm-lbl { text-align: left; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); }
+.dm-foot .dm-tot.loss { color: var(--ink-soft); }
+
+/* ---------- équipement d'un joueur : même tableau que la collection ---------- */
+.board.lo-board { height: 600px; min-height: 0; margin-top: 12px; }
+.lo-board .slot { cursor: default; }
+.lo-board .slot:hover img { transform: none; }
+@media (max-width: 900px) { .board.lo-board { height: auto; } }
+/* le halo des cases dépasse de la grille : pas de barre de défilement horizontale dans la fenêtre */
+#player-dialog { overflow-x: hidden; }
+.lo-board { grid-template-columns: minmax(0, .82fr) minmax(0, 1.08fr) minmax(0, 1.2fr) minmax(0, 1.08fr); }

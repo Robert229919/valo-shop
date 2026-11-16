@@ -362,7 +362,7 @@ function startLive() {
   };
   tick();
 }
-function stopLive() { liveGen++; clearTimeout(liveTimer); liveTimer = null; stopParty(); }
+function stopLive() { liveGen++; clearTimeout(liveTimer); liveTimer = null; stopParty(); stopAgents(); }
 
 async function loadLive() {
   try {
@@ -537,6 +537,7 @@ function renderLive(d) {
     ['Mode', d.mode], ['Serveur', d.server], ['Départ', d.allySide],
   ].filter(([, v]) => v).map(([k, v]) => `<div><span>${k}</span><b>${esc(v)}</b></div>`).join('');
   const n = d.allies.length;
+  const keepAg = pregame ? $('#agent-panel') : null; // panneau d'agent conservé d'un refresh à l'autre
   $('#live-body').innerHTML = `
     <div class="live-head">
       <div class="live-map" ${d.map?.list ? `style="background-image:url('${esc(d.map.list)}')"` : ''}>
@@ -550,14 +551,145 @@ function renderLive(d) {
         <h2><span><i class="glow-dot"></i>Ton équipe</span><em>${n} joueurs</em></h2>
         ${d.allies.map((p, i) => playerRow(p, pregame, i)).join('')}
       </section>
-      <section class="team">
+      ${pregame && !d.enemies.length ? '<section class="team ag-panel" id="agent-slot"></section>' : `<section class="team">
         <h2><span>Adversaires</span><em>${d.enemies.length ? `${d.enemies.length} joueurs` : ''}</em></h2>
         ${d.enemies.length
           ? d.enemies.map((p, i) => playerRow(p, false, n + i)).join('')
           : '<p class="empty">Les adversaires apparaîtront au lancement de la partie.</p>'}
-      </section>
+      </section>`}
     </div>`;
+  if (pregame && !d.enemies.length) mountAgents(keepAg); else stopAgents();
 }
+
+// ---------- choix d'agent (sélection) ----------
+// Le panneau est construit une fois par sélection (déplacé tel quel lors du refresh de 5 s).
+let agState = null, agAt = 0, agBusy = false, agOn = false, agGen = 0, agTimer = null, agTick = null;
+let agKey = '', agArmed = 0, agArmTimer = null;
+const agWait = () => (agState ? Math.max(0, Math.ceil(agState.selectableIn - (Date.now() - agAt) / 1000)) : 0);
+
+function stopAgents() {
+  agOn = false; agGen++;
+  clearTimeout(agTimer); clearInterval(agTick); clearTimeout(agArmTimer);
+  agTimer = agTick = null; agArmed = 0;
+}
+function startAgents() {
+  if (agOn) return;
+  agOn = true;
+  const gen = ++agGen;
+  const poll = async () => {
+    await loadAgents();
+    if (agOn && gen === agGen) agTimer = setTimeout(poll, 2000);
+  };
+  poll();
+  // décompte local entre deux sondages
+  agTick = setInterval(() => {
+    const el = document.querySelector('[data-ag-count]');
+    if (!el || !agState) return;
+    const w = agWait();
+    el.textContent = w;
+    if (w === 0 && agState.selectableIn > 0) { agState.selectableIn = 0; loadAgents(); }
+  }, 1000);
+}
+async function loadAgents() {
+  const my = epoch;
+  try {
+    const d = await api('/api/agents/state');
+    if (my !== epoch || agBusy || !agOn) return;
+    setAgents(d);
+  } catch (e) {
+    if (my !== epoch || !agOn) return;
+    setAgents(null);
+  }
+}
+function setAgents(d) {
+  agState = d; agAt = Date.now();
+  if (d && agArmed && d.selected !== agArmed) disarmLock();
+  renderAgents();
+}
+function disarmLock() { agArmed = 0; clearTimeout(agArmTimer); }
+
+function mountAgents(keep) {
+  const slot = $('#agent-slot');
+  if (!slot) return;
+  if (keep) slot.replaceWith(keep);
+  else {
+    slot.innerHTML = `<h2><span><i class="glow-dot"></i>Agent</span><em id="ag-note"></em></h2>
+      <div class="ag-bar" id="ag-bar"></div><div class="ag-grid" id="ag-grid"></div>`;
+    slot.id = 'agent-panel'; // identifie le panneau construit
+    agKey = ''; agState = null; disarmLock();
+    renderAgents();
+  }
+  startAgents();
+}
+
+function renderAgents() {
+  const panel = $('#agent-panel'), bar = $('#ag-bar'), grid = $('#ag-grid');
+  if (!panel || !bar) return;
+  const s = agState;
+  const w = agWait();
+  const sel = s?.agents?.find((a) => a.id === s.selected);
+  const key = JSON.stringify([!!s?.active, s?.locked, s?.canAct, s?.selected, w > 0, !!agArmed, s?.agents?.map((a) => (a.taken ? 't' : '') + (a.owned ? 'o' : '')).join('')]);
+  if (key === agKey) return;
+  agKey = key;
+  $('#ag-note').textContent = s?.active && s.phaseRemaining != null && !s.locked ? 'Choisis avant la fin du chrono' : '';
+  if (!s || !s.active) {
+    bar.innerHTML = '<span class="ag-hint">Choix d\'agent indisponible pour le moment.</span>';
+    grid.innerHTML = '';
+    return;
+  }
+  if (s.locked) {
+    const a = s.agents.find((x) => x.id === s.lockedAgent) || sel;
+    bar.innerHTML = `<div class="ag-done">${a ? `<img src="${esc(a.icon)}" alt="">` : ''}<span>Verrouillé : <b>${esc(a?.name || 'agent')}</b></span></div>`;
+    grid.innerHTML = '';
+    return;
+  }
+  const lockLabel = agArmed ? 'Confirmer le verrouillage' : `Verrouiller${sel ? ' ' + esc(sel.name) : ''}`;
+  bar.innerHTML = (w > 0
+    ? `<div class="ag-count"><span class="lamp"></span><span>Sélection dans <b data-ag-count>${w}</b> s</span></div>`
+    : `<span class="ag-hint">${sel ? `Choisi : <b>${esc(sel.name)}</b>` : 'Clique sur un agent pour le choisir.'}</span>`)
+    + `<button class="ag-lock ${agArmed ? 'armed' : ''}" id="ag-lock" ${s.canAct && sel ? '' : 'disabled'}>${lockLabel}</button>`;
+  const roles = [];
+  for (const a of s.agents) {
+    let g = roles.find((r) => r.name === a.role);
+    if (!g) roles.push(g = { name: a.role, list: [] });
+    g.list.push(a);
+  }
+  grid.innerHTML = roles.map((g) => `<div class="ag-role"><span>${esc(g.name)}</span><div class="ag-row">${g.list.map((a) => {
+    const off = !s.canAct || !a.owned || a.taken;
+    const why = !a.owned ? ' (non débloqué)' : a.taken ? ' (pris)' : '';
+    return `<button class="ag ${a.mine ? 'mine' : ''} ${!a.owned ? 'locked' : ''} ${a.taken ? 'taken' : ''}" data-agent="${esc(a.id)}"
+      title="${esc(a.name + why)}" aria-label="${esc(a.name + why)}" ${off ? 'disabled' : ''}><img src="${esc(a.icon)}" alt=""></button>`;
+  }).join('')}</div></div>`).join('');
+}
+
+async function agAct(kind, agentId) {
+  if (agBusy) return;
+  agBusy = true;
+  const my = epoch;
+  try {
+    const d = await api(`/api/agents/${kind}`, { agentId });
+    if (my === epoch) { agKey = ''; setAgents(d); }
+  } catch (e) {
+    toast(e.message, true);
+    agKey = ''; disarmLock(); renderAgents();
+  } finally { agBusy = false; }
+}
+document.addEventListener('click', (e) => {
+  const ag = e.target.closest?.('.ag[data-agent]');
+  if (ag && !ag.disabled) {
+    disarmLock();
+    agAct('select', ag.dataset.agent);
+    return;
+  }
+  const lock = e.target.closest?.('#ag-lock');
+  if (!lock || lock.disabled || !agState?.selected) return;
+  if (agArmed === agState.selected) { disarmLock(); agAct('lock', agState.selected); return; }
+  // irréversible : second clic requis dans les 3 s
+  agArmed = agState.selected;
+  clearTimeout(agArmTimer);
+  agArmTimer = setTimeout(() => { disarmLock(); agKey = ''; renderAgents(); }, 3000);
+  agKey = ''; renderAgents();
+});
 
 // Le tableau de bord prend la hauteur restante : pas de scroll de page.
 function fitDash() {
@@ -694,6 +826,79 @@ async function loadMyStats(force = false) {
   if (q === statsQueue) renderMyStats();
 }
 
+// ---------- historique paginé (15 parties par page, cache mémoire par file) ----------
+const HIST_SIZE = 15;
+const histCache = new Map(); // `${file}|${page}` -> données de /api/stats/history
+let histPage = 0;
+let histReq = null;   // { key, status: 'loading'|'err', err } : dernière requête lancée
+let histShown = null; // dernière page affichée { queue, page, data } (reste visible, grisée, pendant un chargement)
+const histKey = (q = statsQueue, p = histPage) => `${q}|${p}`;
+
+function histInner() {
+  const key = histKey();
+  const cur = histCache.get(key);
+  const shown = cur ? { queue: statsQueue, page: histPage, data: cur } : (histShown?.queue === statsQueue ? histShown : null);
+  const loading = histReq?.key === key && histReq.status === 'loading';
+  const err = histReq?.key === key && histReq.status === 'err' ? histReq : null;
+  const d = shown?.data;
+  const rows = d ? d.matches.map((m) => matchRow(m)).join('') : '';
+  const empty = d && !d.matches.length ? '<p class="play-note hist-empty">Aucune partie à cet endroit.</p>' : '';
+  const wait = !d && loading ? '<p class="play-note hist-empty">Lecture des parties…</p>' : '';
+  // pager : "Page 2 / 7 (parties 16–30)"
+  const p = shown ? shown.page : histPage;
+  const from = p * HIST_SIZE + 1;
+  const total = isNum(d?.total) ? d.total : null;
+  const to = d ? (d.hasMore ? (p + 1) * HIST_SIZE : (total ?? from - 1 + d.matches.length)) : 0;
+  const pages = total != null ? Math.max(1, Math.ceil(total / HIST_SIZE)) : null;
+  const lbl = `Page ${p + 1}${pages ? ` / ${pages}` : ''}${d && to >= from ? ` <small>(parties ${from}–${to})</small>` : ''}`;
+  const canNext = !!d && d.hasMore && !loading;
+  const canPrev = p > 0 && !loading;
+  return `
+    <h3 class="ms-h">Dernières parties<em>${total != null ? `${total} au total` : ''}</em></h3>
+    <div class="mt-list ${loading ? 'is-loading' : ''}">${rows}${empty}${wait}</div>
+    <div class="hist-pager">
+      <button class="link-btn" data-hist="prev" ${canPrev ? '' : 'disabled'}>← Précédente</button>
+      <span class="hist-lbl">${lbl}</span>
+      <button class="link-btn" data-hist="next" ${canNext ? '' : 'disabled'}>Suivante →</button>
+    </div>
+    ${err ? `<p class="hist-err">Chargement impossible. <button class="link-btn" data-hist="retry">Réessayer</button></p>` : ''}`;
+}
+function renderHist() {
+  const el = document.querySelector('#mystats .ms-matches');
+  if (!el) return;
+  const list = el.querySelector('.mt-list');
+  const top = list ? list.scrollTop : 0;
+  el.innerHTML = histInner();
+  const nl = el.querySelector('.mt-list');
+  if (nl) nl.scrollTop = top;
+}
+async function loadHist(force = false) {
+  const q = statsQueue, p = histPage, key = histKey(q, p);
+  if (!force && histCache.has(key)) { histReq = null; histShown = { queue: q, page: p, data: histCache.get(key) }; renderHist(); return; }
+  if (histReq?.key === key && (histReq.status === 'loading' || (!force && histReq.status === 'err'))) return;
+  const req = { key, status: 'loading' };
+  histReq = req;
+  renderHist();
+  const my = epoch;
+  try {
+    const data = await api(`/api/stats/history?queue=${encodeURIComponent(q)}&page=${p}&size=${HIST_SIZE}`);
+    if (my !== epoch) return;
+    histCache.set(key, data);
+    if (histReq === req) histReq = null;
+    if (q === statsQueue && p === histPage) { histShown = { queue: q, page: p, data }; renderHist(); const l = document.querySelector('#mystats .mt-list'); if (l) l.scrollTop = 0; }
+  } catch (e) {
+    if (my !== epoch) return;
+    if (histReq === req) { req.status = 'err'; req.err = e.message; }
+    if (q === statsQueue && p === histPage) renderHist();
+  }
+}
+function histGo(d) {
+  if (histReq?.status === 'loading') return;
+  histPage = Math.max(0, histPage + d);
+  loadHist();
+}
+function histReset() { histCache.clear(); histPage = 0; histReq = null; histShown = null; }
+
 function matchRow(m, focus) {
   const res = m.draw ? 'draw' : m.won ? 'win' : 'loss';
   const rr = isNum(m.rrChange) ? `<b class="mt-rr ${+m.rrChange > 0 ? 'up' : +m.rrChange < 0 ? 'down' : ''}">${signed(m.rrChange)}</b>` : '<b class="muted">—</b>';
@@ -748,6 +953,7 @@ function renderMyStats() {
     body = statsBody(data);
   }
   el.innerHTML = head + body;
+  if (el.querySelector('.ms-matches')) loadHist(); // charge la page courante si besoin (sans effet sinon)
 }
 
 function statsBody(d) {
@@ -774,6 +980,7 @@ function statsBody(d) {
       <div class="ms-nums">
         <div class="ms-row">${nums.map(([k, v, c]) => `<div class="ms-num ${c || ''}"><b>${v}</b><span>${k}</span></div>`).join('')}</div>
         <p class="ms-line">${line}</p>
+        <p class="ms-note">Chiffres, agents et cartes : tes ${s.matches} dernières parties.</p>
       </div>
     </div>
     ${cool.length ? `<div class="ms-cool">${cool.slice(0, 6).map((c) => `
@@ -787,10 +994,7 @@ function statsBody(d) {
         <h3 class="ms-h">Cartes</h3>
         ${(d.maps || []).slice(0, 4).map((m) => topRow(m, 'map')).join('') || '<p class="play-note">—</p>'}
       </div>
-      <div class="ms-matches">
-        <h3 class="ms-h">Dernières parties<em>${(d.matches || []).length}</em></h3>
-        <div class="mt-list">${(d.matches || []).map((m) => matchRow(m)).join('')}</div>
-      </div>
+      <div class="ms-matches">${histInner()}</div>
     </div>`;
 }
 
@@ -865,30 +1069,37 @@ function paintPlayerStats() {
 // équipement complet, rangé comme le menu d'achat
 function loadoutGrid(lo) {
   if (!Array.isArray(lo) || !lo.length) return '<p class="play-note">Équipement indisponible pour ce joueur.</p>';
-  const cat = (w) => String(w?.category || '').replace(/^.*::/, '');
-  const cols = BOARD.map((col) => col.map((g) => ({ ...g, items: [] })));
-  const other = { label: 'Autres', order: [], items: [] };
-  for (const it of lo) {
-    const g = cols.flat().find((x) => x.cat === cat(it.weapon));
-    (g || other).items.push(it);
-  }
-  if (other.items.length) cols[cols.length - 1].push(other);
-  const item = (it) => {
+  // même tableau que la collection : 4 colonnes rangées par catégorie, dans l'ordre du menu d'achat.
+  // La catégorie arrive en français ("Armes de poing") ou en code ("Sidearm").
+  const CAT_FR = {
+    'armes de poing': 'Sidearm', mitraillettes: 'SMG', 'fusils à pompe': 'Shotgun', fusils: 'Rifle',
+    'fusils de précision': 'Sniper', 'armes lourdes': 'Heavy', mitrailleuses: 'Heavy', 'corps à corps': 'Melee',
+  };
+  const catOf = (w) => { const c = String(w?.category || '').replace(/^.*::/, ''); return CAT_FR[c.toLowerCase()] || c; };
+  const placed = new Set();
+  const slot = (it) => {
     const wn = it.weapon?.name || '';
     const sk = it.skin || {};
     const title = sk.isDefault ? 'Standard' : splitName(sk.name || wn, wn).title || wn;
     const img = sk.image || it.weapon?.icon;
     return `
-      <div class="lo-item ${sk.isDefault ? 'is-default' : ''}" title="${esc(sk.name || wn)}">
-        <div class="lo-img">${img ? `<img src="${esc(img)}" alt="" loading="lazy">` : ''}</div>
-        <div class="lo-txt"><b>${esc(title)}</b><span>${esc(wn)}</span></div>
+      <div class="slot ${sk.isDefault ? 'is-default' : ''}" title="${esc(sk.name || wn)}">
+        ${img ? `<img src="${esc(img)}" alt="" loading="lazy">` : ''}
+        <span class="slot-text"><span class="slot-name">${esc(wn)}</span><span class="slot-skin">${esc(title)}</span></span>
       </div>`;
   };
-  return `<div class="lo">${cols.map((col) => `
-    <div class="lo-col">${col.filter((g) => g.items.length).map((g) => {
-      const rank = (it) => { const i = g.order.indexOf(it.weapon?.name); return i < 0 ? 99 : i; };
-      return `<section class="lo-group"><h4>${esc(g.label)}</h4>${g.items.sort((a, b) => rank(a) - rank(b)).map(item).join('')}</section>`;
-    }).join('')}</div>`).join('')}</div>`;
+  const group = (g) => {
+    const rank = (it) => { const i = (g.order || []).indexOf(it.weapon?.name); return i < 0 ? 99 : i; };
+    const items = lo.filter((it) => catOf(it.weapon) === g.cat).sort((a, b) => rank(a) - rank(b));
+    items.forEach((it) => placed.add(it));
+    if (!items.length) return '';
+    return `<section class="board-group" style="flex:${items.length} 1 0"><h2>${esc(g.label)}</h2><div class="board-items">${items.map(slot).join('')}</div></section>`;
+  };
+  const cols = BOARD.map((col) => `<div class="board-col">${col.map(group).join('')}</div>`);
+  // catégories inconnues : rangées à part, dans la dernière colonne
+  const rest = lo.filter((it) => !placed.has(it));
+  if (rest.length) cols[cols.length - 1] = cols[cols.length - 1].replace(/<\/div>$/, `<section class="board-group" style="flex:${rest.length} 1 0"><h2>Autres</h2><div class="board-items">${rest.map(slot).join('')}</div></section></div>`);
+  return `<div class="board lo-board">${cols.join('')}</div>`;
 }
 
 // clics dans l'onglet En jeu (délégation : le contenu est régénéré)
@@ -898,8 +1109,13 @@ $('#live-body').addEventListener('click', (e) => {
   const a = e.target.closest('[data-party]');
   if (a) { partyAction(a.dataset.party); return; }
   const sq = e.target.closest('[data-stq]');
-  if (sq) { statsQueue = sq.dataset.stq; renderMyStats(); loadMyStats(); return; }
-  if (e.target.closest('[data-act="stats-refresh"]')) { loadMyStats(true); return; }
+  if (sq) { statsQueue = sq.dataset.stq; histPage = 0; histReq = null; renderMyStats(); loadMyStats(); return; }
+  if (e.target.closest('[data-act="stats-refresh"]')) { histCache.clear(); histReq = null; loadMyStats(true); loadHist(true); return; }
+  const hb = e.target.closest('[data-hist]');
+  if (hb) {
+    if (hb.dataset.hist === 'retry') loadHist(true); else histGo(hb.dataset.hist === 'next' ? 1 : -1);
+    return;
+  }
   const row = e.target.closest('.pl[data-idx]');
   if (row) openPlayer(+row.dataset.idx);
 });
@@ -915,9 +1131,10 @@ $('#player-dialog').addEventListener('close', () => { pdPlayer = null; });
 
 // changement de compte : on oublie tout ce qui concerne l'ancien
 function resetLiveCaches() {
-  stopParty();
+  stopParty(); stopAgents(); agState = null; agKey = '';
   pStats.clear(); pQueue.length = 0;
   for (const k of Object.keys(myStats)) delete myStats[k];
+  histReset();
   partyData = null; partyErr = null; partyKey = ''; mmSeenAt = null;
   liveData = null; livePlayers = [];
   if ($('#player-dialog').open) $('#player-dialog').close();
@@ -1270,16 +1487,20 @@ function mdDuels(d) {
   const A = d.duels.allies.map((id) => byId[id]);
   const E = d.duels.enemies.map((id) => byId[id]);
   if (!A.length || !E.length) return '<p class="empty">Pas de duels dans ce mode.</p>';
-  const head = `<div class="dm-row dm-head"><span></span>${E.map((p) => `<span class="dm-who">${pIcon(p)}<small>${pName(p)}</small></span>`).join('')}<span class="dm-tot">Bilan</span></div>`;
-  const rows = A.map((a, i) => {
+  // alliés en colonnes (en haut), adversaires en lignes (à gauche) ; chaque case reste vue du côté de l'allié
+  const head = `<div class="dm-row dm-head"><span></span>${A.map((p) => `<span class="dm-who ${p.self ? 'me' : ''}">${pIcon(p)}<small>${pName(p)}</small></span>`).join('')}<span class="dm-tot">Bilan</span></div>`;
+  const colTot = A.map(() => ({ k: 0, d: 0 }));
+  const rows = E.map((e, j) => {
     let K = 0, D = 0;
-    const cells = d.duels.matrix[i].map((c, j) => {
-      K += c.kills; D += c.deaths;
+    const cells = A.map((a, i) => {
+      const c = d.duels.matrix[i][j];
+      K += c.kills; D += c.deaths; colTot[i].k += c.kills; colTot[i].d += c.deaths;
       const cls = c.kills > c.deaths ? 'win' : c.kills < c.deaths ? 'loss' : 'even';
-      return `<span class="dm-c ${cls}" title="${pName(a)} a éliminé ${pName(E[j])} ${c.kills} fois, et s'est fait éliminer ${c.deaths} fois"><b>${c.kills}</b><i>–</i>${c.deaths}</span>`;
+      return `<span class="dm-c ${cls} ${a.self ? 'me-col' : ''}" title="${pName(a)} a éliminé ${pName(e)} ${c.kills} fois, et s'est fait éliminer ${c.deaths} fois"><b>${c.kills}</b><i>–</i>${c.deaths}</span>`;
     }).join('');
-    return `<div class="dm-row ${a.self ? 'me' : ''}"><span class="rg-who">${pIcon(a)}<span>${pName(a)}</span></span>${cells}<span class="dm-tot ${K > D ? 'win' : K < D ? 'loss' : ''}">${signed(K - D)}</span></div>`;
+    return `<div class="dm-row"><span class="rg-who">${pIcon(e)}<span>${pName(e)}</span></span>${cells}<span class="dm-tot ${K > D ? 'win' : K < D ? 'loss' : ''}">${signed(K - D)}</span></div>`;
   }).join('');
+  const foot = `<div class="dm-row dm-foot"><span class="dm-tot dm-lbl">Bilan</span>${colTot.map((t) => `<span class="dm-tot ${t.k > t.d ? 'win' : t.k < t.d ? 'loss' : ''}">${signed(t.k - t.d)}</span>`).join('')}<span></span></div>`;
   // tes rivaux : ta proie et ta bête noire
   let rivals = '';
   const mi = A.findIndex((p) => p.self);
@@ -1293,8 +1514,8 @@ function mdDuels(d) {
       ${nemesis && nemesis.deaths > nemesis.kills ? card('Ta bête noire', nemesis, `${nemesis.deaths} morts pour ${nemesis.kills} éliminations`) : ''}
     </div>`;
   }
-  return `<p class="play-note dm-help">Chaque case : <b>éliminations</b> – morts de l'allié (ligne) face à l'adversaire (colonne).</p>
-    <div class="dm" style="--cols:${E.length}">${head}${rows}</div>${rivals}`;
+  return `<p class="play-note dm-help">Chaque case : <b>éliminations</b> – morts de l'allié (colonne) face à l'adversaire (ligne).</p>
+    <div class="dm" style="--cols:${A.length}">${head}${rows}${foot}</div>${rivals}`;
 }
 
 document.addEventListener('click', (e) => {

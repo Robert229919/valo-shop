@@ -1,0 +1,12 @@
+/* Historique paginé des parties (agent historique) */
+.ms-note { margin: 4px 0 0; font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ms-matches .mt-list { transition: opacity .15s; }
+.ms-matches .mt-list.is-loading { opacity: .45; pointer-events: none; }
+.hist-empty { margin: 14px 0; }
+.hist-pager { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 4px 0; border-top: 1px solid var(--line); margin-top: 6px; white-space: nowrap; }
+.hist-lbl { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: var(--display); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ink); }
+.hist-lbl small { font-family: var(--serif); font-style: italic; font-weight: 400; font-size: 14px; letter-spacing: 0; text-transform: none; color: var(--ink-soft); }
+.hist-pager .link-btn { font-family: var(--serif); font-style: italic; font-weight: 400; font-size: 14px; letter-spacing: 0; text-transform: none; white-space: nowrap; }
+.hist-pager .link-btn:disabled { opacity: .35; cursor: default; text-decoration: none; }
+.hist-err { flex: none; margin: 4px 0 0; font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hist-err .link-btn { font-size: 13px; }
