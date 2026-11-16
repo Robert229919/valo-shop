@@ -405,6 +405,69 @@ export async function playerStats({ puuid, n = 5, queue: queueId = 'competitive'
   });
 }
 
+// ---------- historique paginé (pages de `size` parties, directement via l'API Riot) ----------
+// Liste RR (competitiveupdates) accumulée par paquets de 20 jusqu'à couvrir la date voulue.
+const updAcc = new Map();
+function compUpdatesCovering(ctx, puuid, minStart) {
+  let st = updAcc.get(puuid);
+  if (!st || Date.now() - st.at > 120_000) { st = { at: Date.now(), list: [], done: false, lock: Promise.resolve() }; updAcc.set(puuid, st); }
+  const run = st.lock.then(async () => {
+    while (!st.done && (!st.list.length || st.list[st.list.length - 1].MatchStartTime > minStart)) {
+      counters.updates++;
+      const s = st.list.length;
+      let r;
+      try { r = await queuedCall(ctx, `/mmr/v1/players/${puuid}/competitiveupdates?startIndex=${s}&endIndex=${s + 20}&queue=competitive`); }
+      catch (e) { if (e.riotStatus === 400) { st.done = true; break; } throw e; }
+      const items = r?.Matches || [];
+      st.list.push(...items);
+      if (items.length < 20) st.done = true;
+    }
+    return new Map(st.list.map((m) => [m.MatchID, m]));
+  });
+  st.lock = run.catch(() => {});
+  return run;
+}
+
+export async function matchHistory({ queue: queueId = 'competitive', page = 0, size = 15 } = {}) {
+  size = Math.max(1, Math.min(Math.floor(Number(size)) || 15, 20));
+  page = Math.max(0, Math.floor(Number(page)) || 0);
+  queueId = String(queueId || 'competitive');
+  const ctx = await activeContext();
+  return matchHistoryFor(ctx, ctx.puuid, { queue: queueId, page, size });
+}
+
+// variante sur un puuid donné (utilisée par matchHistory ; pratique pour les tests)
+export function matchHistoryFor(ctx, puuid, { queue: queueId, page, size }) {
+  return cached(`mh|${puuid}|${queueId}|${page}|${size}`, 120_000, async () => {
+    const start = page * size, end = start + size;
+    const q = queueId === 'all' ? '' : `&queue=${encodeURIComponent(queueId)}`;
+    counters.history++;
+    let r;
+    try {
+      r = await queuedCall(ctx, `/match-history/v1/history/${puuid}?startIndex=${start}&endIndex=${end}${q}`);
+    } catch (e) {
+      // Riot répond 400 quand startIndex dépasse la profondeur disponible : page vide
+      if (e.riotStatus !== 400) throw e;
+      r = { History: [], Total: null };
+    }
+    const history = r?.History || [];
+    const total = Number.isFinite(r?.Total) ? r.Total : null;
+    const hasMore = total != null ? end < total : history.length === size;
+    const assets = await getGameAssets();
+    // RR : seulement pour les lignes classées, fenêtre de dates de la page
+    const ranked = history.filter((h) => h.QueueID === 'competitive');
+    const [matches, upd] = await Promise.all([
+      getMatches(ctx, history.map((h) => h.MatchID)),
+      ranked.length
+        ? compUpdatesCovering(ctx, puuid, Math.min(...ranked.map((h) => h.GameStartTime))).catch((e) => { console.warn('[stats] rr', e.message); return null; })
+        : Promise.resolve(null),
+    ]);
+    const matchesOut = matches.map((m) => matchItem(m, puuid, assets, upd)).filter(Boolean)
+      .sort((a, b) => b.date - a.date).map(publicItem);
+    return { queue: queueId, page, size, total, hasMore, matches: matchesOut };
+  });
+}
+
 // diagnostic (compteurs d'appels / cache)
 export function statsDebug() {
   return { ...counters, cacheDir: CACHE_DIR, memMatches: matchMem.size, queueActive: queue.active };

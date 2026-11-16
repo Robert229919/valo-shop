@@ -1,6 +1,7 @@
 // Infos sur la partie en cours : sélection des agents (pregame) ou partie lancée (core-game).
 // Rangs via /mmr, noms via name-service, skins via les loadouts de la partie.
 import { liveContext, localPresences, getAssets, activePuuid } from './riot.js';
+import { noteMatchSeen } from './agents.js';
 
 const SOCKET_SKIN = 'bcef87d6-209b-46c6-8b19-fbe40bd95abc';
 const SOCKET_CHROMA = '3ad1b2b2-acdb-4524-852f-954a76ddae0a';
@@ -227,6 +228,7 @@ export async function buildLive() {
   if (!matchId) return { state: 'menu', source: ctx.source };
 
   const match = await ctx.call(`/${kind}/v1/matches/${matchId}`, { host: 'glz' });
+  if (kind === 'pregame') noteMatchSeen(matchId); // départ du délai avant le choix d'agent
   const [assets, seasons, { skins, loadouts }, presence] = await Promise.all([
     getGameAssets(), getSeasons(ctx), skinsByPlayer(ctx, kind, matchId), presenceInfo(self),
   ]);

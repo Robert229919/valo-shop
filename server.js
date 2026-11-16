@@ -8,8 +8,9 @@ import {
   ITEM_TYPES, CURRENCIES, LOGIN_URL,
 } from './riot.js';
 import { buildLive } from './live.js';
-import { myStats, playerStats, matchDetail } from './stats.js';
+import { myStats, playerStats, matchDetail, matchHistory } from './stats.js';
 import { partyState, setQueue, startQueue, stopQueue, launchGame } from './party.js';
+import { agentSelectState, selectAgent, lockAgent } from './agents.js';
 
 const PORT = Number(process.env.PORT) || 5173;
 const HOST = '127.0.0.1'; // accessible uniquement depuis ce PC
@@ -296,6 +297,7 @@ const routes = {
   // partie en cours : les erreurs restent dans l'onglet (pas de déconnexion de l'appli)
   // statistiques des parties (erreurs gardées dans l'onglet)
   'GET /api/stats/me': (q) => soft(() => myStats({ queue: q.queue || 'competitive', n: clampN(q.n, 20) })),
+  'GET /api/stats/history': (q) => soft(() => matchHistory({ queue: q.queue || 'competitive', page: q.page, size: q.size })),
   'GET /api/stats/player': (q) => {
     if (!/^[0-9a-f-]{36}$/i.test(q.puuid || '')) throw Object.assign(new Error('puuid invalide'), { status: 400 });
     return soft(() => playerStats({ puuid: q.puuid, n: clampN(q.n, 5), queue: q.queue || 'competitive' }));
@@ -307,6 +309,10 @@ const routes = {
   'POST /api/party/start': () => soft(startQueue),
   'POST /api/party/stop': () => soft(stopQueue),
   'POST /api/game/launch': () => soft(launchGame),
+  // choix d'agent pendant la sélection (délai de 10 s imposé dans agents.js)
+  'GET /api/agents/state': () => soft(agentSelectState),
+  'POST /api/agents/select': (b) => soft(() => selectAgent(String(b.agentId || ''))),
+  'POST /api/agents/lock': (b) => soft(() => lockAgent(String(b.agentId || ''))),
   'GET /api/live': async () => {
     try { return await buildLive(); } catch (e) { throw Object.assign(new Error(e.message), { status: 503 }); }
   },
