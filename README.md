@@ -40,6 +40,18 @@ Pour publier une nouvelle version :
 
 Les applis installées se mettent alors à jour toutes seules.
 
-## Avertissement
+## Avertissement et limitation de responsabilité
 
-L'appli utilise les API internes, non officielles, de Riot, comme VALpaw et les autres applis du même genre. Usage personnel. Riot peut changer ces API à tout moment. Projet non affilié à Riot Games.
+Ce projet est **non officiel** et **n'est ni affilié, ni approuvé, ni sponsorisé par Riot Games**. VALORANT et Riot Games sont des marques de Riot Games, Inc.
+
+L'appli utilise les **API internes, non documentées**, du client Riot, comme d'autres applis du même genre. Riot peut les modifier ou les bloquer à tout moment, et leur usage par des outils tiers **peut être contraire aux conditions d'utilisation de Riot**.
+
+**Tu l'utilises à tes propres risques.** L'auteur de ce projet et ses contributeurs :
+
+- **ne sont pas responsables** des sanctions, suspensions, bannissements (temporaires ou définitifs), restrictions, pertes de rang, d'objets ou de données qu'un compte pourrait subir, de près ou de loin, à cause de l'utilisation de cette appli ;
+- **ne garantissent rien** : le logiciel est fourni « tel quel », sans garantie d'aucune sorte, et peut cesser de fonctionner à tout moment ;
+- **se désolidarisent entièrement** de tout usage qui contreviendrait aux règles de Riot ou à celles du jeu, et de toute conséquence qui en découlerait.
+
+Certaines fonctions **agissent sur ton compte** (changer de skin équipé, choisir le mode, lancer la recherche, choisir et verrouiller un agent). Ce sont elles qui présentent le plus de risques : n'active que ce dont tu acceptes les conséquences.
+
+Ton mot de passe n'est jamais lu ni enregistré par l'appli (la connexion passe par la page officielle de Riot) et aucune donnée n'est envoyée à l'auteur.
