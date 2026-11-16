@@ -120,10 +120,58 @@ app.whenReady().then(async () => {
   setupAutoUpdate();
 });
 
-// Mises à jour automatiques via les releases GitHub (version installée uniquement :
-// ni en dev, ni pour la version portable).
+// Version portable : au lancement (puis toutes les 6 h) on vérifie la dernière release GitHub et on propose
+// de la télécharger ; l'exe portable est alors remplacé et l'appli se relance toute seule.
+async function setupPortableUpdate() {
+  const portableFile = process.env.PORTABLE_EXECUTABLE_FILE;
+  let mod;
+  try { mod = await import('./portable-update.js'); } catch (e) { console.warn('[update]', e.message); return; }
+  let busy = false;
+  let notified = null; // une seule proposition par version et par session
+  const check = async () => {
+    if (busy) return;
+    let info;
+    try { info = await mod.checkForPortableUpdate(app.getVersion()); } catch (e) { console.warn('[update]', e.message); return; }
+    if (!info || notified === info.version || !mainWindow || mainWindow.isDestroyed()) return;
+    notified = info.version;
+    const { response } = await dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'Mise à jour disponible',
+      message: `Valo Shop ${info.version} est disponible (tu as la ${app.getVersion()}).`,
+      detail: "Télécharger la nouvelle version maintenant ? L'appli se fermera puis se relancera toute seule : ton fichier portable est remplacé par la nouvelle version.",
+      buttons: ['Mettre à jour', 'Plus tard'],
+      defaultId: 0, cancelId: 1,
+    });
+    if (response !== 0) return;
+    busy = true;
+    try {
+      // à côté de l'exe portable si le dossier est modifiable, sinon dans le dossier temporaire
+      let dir = path.dirname(portableFile);
+      try { fs.accessSync(dir, fs.constants.W_OK); } catch { dir = app.getPath('temp'); }
+      const file = await mod.downloadUpdate(info, dir, (p) => { if (!mainWindow.isDestroyed()) mainWindow.setProgressBar(p); });
+      if (!mainWindow.isDestroyed()) mainWindow.setProgressBar(-1);
+      mod.applyUpdate(file, portableFile);
+      app.quit();
+    } catch (e) {
+      busy = false;
+      if (!mainWindow.isDestroyed()) mainWindow.setProgressBar(-1);
+      const r = await dialog.showMessageBox(mainWindow, {
+        type: 'error', title: 'Mise à jour impossible',
+        message: 'Le téléchargement de la mise à jour a échoué.', detail: String(e.message || e),
+        buttons: ['Ouvrir la page de téléchargement', 'Fermer'], defaultId: 0, cancelId: 1,
+      });
+      if (r.response === 0) shell.openExternal(info.page);
+    }
+  };
+  setTimeout(check, 8000);
+  setInterval(check, 6 * 3600_000);
+}
+
+// Mises à jour automatiques via les releases GitHub (version installée : electron-updater ;
+// version portable : voir setupPortableUpdate ; rien en dev).
 async function setupAutoUpdate() {
-  if (!app.isPackaged || process.env.PORTABLE_EXECUTABLE_DIR) return;
+  if (!app.isPackaged) return;
+  if (process.env.PORTABLE_EXECUTABLE_FILE) return setupPortableUpdate();
   let autoUpdater;
   try {
     const mod = await import('electron-updater');
