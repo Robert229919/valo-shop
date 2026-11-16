@@ -33,6 +33,7 @@
       "live.js",
       "stats.js",
       "party.js",
+      "agents.js",
       "package.json"
     ],
     "win": {
