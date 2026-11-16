@@ -5,9 +5,10 @@ Appli Windows pour Valorant :
 - **Boutique** : offres du jour, marché nocturne, et le contenu complet des packs.
 - **Collection** : tous tes skins par arme (possédés, équipés), avec changement de skin et de variante depuis l'appli.
 - **En jeu** :
-  - rangs, stats et skins des joueurs de ta partie ;
-  - tes stats récentes, avec le détail de chaque partie (tableau des scores, rounds, duels) ;
-  - choix du mode et lancement de la recherche.
+  - rangs, stats et équipement complet (rangé comme la collection) des joueurs de ta partie ;
+  - tes stats récentes, avec l'historique des parties par pages de 15 (dans la limite de ce que l'API de Riot conserve, environ 7 à 8 semaines) et le détail de chaque partie (tableau des scores, rounds, duels) ;
+  - choix du mode et lancement de la recherche ;
+  - choix et verrouillage de l'agent depuis l'appli, avec 10 secondes d'attente après la détection de la partie.
 - **Plusieurs comptes** Riot.
 
 ## Télécharger
