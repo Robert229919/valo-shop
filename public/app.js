@@ -657,7 +657,7 @@ function renderAgents() {
   grid.innerHTML = roles.map((g) => `<div class="ag-role"><span>${esc(g.name)}</span><div class="ag-row">${g.list.map((a) => {
     const off = !s.canAct || !a.owned || a.taken;
     const why = !a.owned ? ' (non débloqué)' : a.taken ? ' (pris)' : '';
-    return `<button class="ag ${a.mine ? 'mine' : ''} ${!a.owned ? 'locked' : ''} ${a.taken ? 'taken' : ''}" data-agent="${esc(a.id)}"
+    return `<button class="agpick ${a.mine ? 'mine' : ''} ${!a.owned ? 'locked' : ''} ${a.taken ? 'taken' : ''}" data-agent="${esc(a.id)}"
       title="${esc(a.name + why)}" aria-label="${esc(a.name + why)}" ${off ? 'disabled' : ''}><img src="${esc(a.icon)}" alt=""></button>`;
   }).join('')}</div></div>`).join('');
 }
@@ -675,7 +675,7 @@ async function agAct(kind, agentId) {
   } finally { agBusy = false; }
 }
 document.addEventListener('click', (e) => {
-  const ag = e.target.closest?.('.ag[data-agent]');
+  const ag = e.target.closest?.('.agpick[data-agent]');
   if (ag && !ag.disabled) {
     disarmLock();
     agAct('select', ag.dataset.agent);
@@ -921,10 +921,12 @@ function topRow(x, kind) {
   const pic = kind === 'map'
     ? `<span class="ag-map" ${x.image ? `style="background-image:url('${esc(x.image)}')"` : ''}></span>`
     : (x.icon ? `<img src="${esc(x.icon)}" alt="">` : '<span class="ag-map"></span>');
+  const w = isNum(wr) ? Math.max(0, Math.min(100, Math.round(wr > 1 ? wr : wr * 100))) : 0;
   return `
-    <div class="ag ${kind}" style="--w:${isNum(wr) ? Math.max(0, Math.min(100, Math.round(wr > 1 ? wr : wr * 100))) : 0}%">
+    <div class="ag ${kind}" style="--w:${w}%" title="${esc(x.name)} : ${x.wins ?? '?'} victoires sur ${x.matches ?? 0} parties">
       ${pic}<span class="ag-name">${esc(x.name)}</span>
-      <span class="ag-wr">${pct(wr)}</span><span class="ag-n">${x.matches ?? 0} p.</span>
+      <span class="ag-kd" title="K/D">${isNum(x.kd) ? fr(x.kd, 2) : '—'}</span>
+      <span class="ag-wr ${w >= 50 ? 'up' : ''}">${pct(wr)}</span><span class="ag-n">${x.matches ?? 0} p.</span>
     </div>`;
 }
 
@@ -989,7 +991,7 @@ function statsBody(d) {
       </div>`).join('')}</div>` : ''}
     <div class="ms-bottom">
       <div class="ms-side">
-        <h3 class="ms-h">Agents<em>victoires · parties</em></h3>
+        <h3 class="ms-h">Agents<em>K/D · victoires · parties</em></h3>
         ${(d.agents || []).slice(0, 4).map((a) => topRow(a, 'agent')).join('') || '<p class="play-note">—</p>'}
         <h3 class="ms-h">Cartes</h3>
         ${(d.maps || []).slice(0, 4).map((m) => topRow(m, 'map')).join('') || '<p class="play-note">—</p>'}
