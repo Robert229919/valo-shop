@@ -833,3 +833,19 @@ body:has(#live:not(.hidden)) main { padding-bottom: 16px; padding-top: 22px; }
 /* le halo des cases dépasse de la grille : pas de barre de défilement horizontale dans la fenêtre */
 #player-dialog { overflow-x: hidden; }
 .lo-board { grid-template-columns: minmax(0, .82fr) minmax(0, 1.08fr) minmax(0, 1.2fr) minmax(0, 1.08fr); }
+
+/* ---------- listes Agents / Cartes (Mes stats) : lignes pleine largeur, cartes en rectangles ---------- */
+.ag { grid-template-columns: 30px minmax(0, 1fr) auto auto auto; gap: 10px; padding: 4px 0; }
+.ag.map { grid-template-columns: 62px minmax(0, 1fr) auto auto auto; }
+.ag-map { display: block; width: 62px; height: 32px; border-radius: 2px; background: var(--wall-2) center / cover no-repeat; border: 1px solid var(--line); }
+.ag-kd { min-width: 34px; text-align: right; font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--ink-soft); }
+.ag-wr { min-width: 40px; text-align: right; }
+.ag-wr.up { color: var(--glow); }
+/* compactage : le nom d'une carte ou d'un agent ne doit jamais être tronqué, et la colonne ne défile pas */
+.ag { gap: 8px; padding: 3px 0; }
+.ag.map { grid-template-columns: 56px minmax(0, 1fr) auto auto auto; }
+.ag-map { width: 56px; height: 30px; }
+.ag-kd { min-width: 30px; }
+.ag-wr { min-width: 36px; }
+.ag-n { min-width: 30px; }
+.ms-side .ms-h em { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
